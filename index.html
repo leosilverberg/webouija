@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Socket.IO chat</title>
+
+</head>
+
+<body>
+  <a href="/ghost" id="becomeghost">GHOST</a><br>
+  <div id="ghostlist">
+
+  </div>
+  <a href="/notghost">NOT GHOST</a>
+  <div id="notghostlist">
+
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+  <script>
+    var notghosts = [];
+    var ghosts = [];
+
+
+
+    var socket = io();
+
+    //when a ghost first connects or disconnects
+    socket.on('ghostlist', function (ghostlist) {
+      ghosts = ghostlist;
+      $('#ghostlist').html(ghosts.length);
+      checkAvailableGhost()
+      console.log(ghosts)
+    })
+
+    //when a not ghost first connects or disconnects
+    socket.on('notghostlist', function (notghostlist) {
+      notghosts = notghostlist;
+      $('#notghostlist').html(notghosts.length);
+      checkAvailableGhost()
+      console.log(notghosts)
+    })
+
+    function checkAvailableGhost() {
+      if (notghosts < 1) {
+        $('#becomeghost').hide();
+      } else {
+        $('#becomeghost').show();
+      }
+    }
+  </script>
+
+</html>

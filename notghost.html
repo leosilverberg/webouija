@@ -1,0 +1,172 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Socket.IO chat</title>
+  <link rel="stylesheet" type="text/css" href="style.css" />
+</head>
+
+<body>
+  <h1>NOT GHOST</h1>
+  <p id="messages">waiting for a ghost...</p>
+
+  <div id="gameArea">
+    <canvas id="gameCanvas"></canvas>
+    <div id="statsPanel"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+  <script src="https://unpkg.com/konva@4.0.18/konva.min.js"></script>
+  <script>
+    var c;
+    var ctx;
+    // drag related variables
+    var dragok = false;
+    var startX;
+    var startY;
+    var WIDTH;
+    var HEIGHT;
+    var offsetX;
+    var offsetY = 0;
+    // an array of objects that define different shapes
+    var shapes = [];
+
+    var planchette = new Image();
+    planchette.src = "images/planchette.png";
+    var planchetteLoaded = false;
+
+
+
+
+    //when the document is loaded
+    $(document).ready(function () {
+      //c is the canvas
+      c = document.getElementById("gameCanvas");
+      //ctx is the context of the canvas
+      ctx = c.getContext("2d");
+
+      //attach stuff for detecting resize of the screen
+      window.addEventListener('resize', resizeGame, false);
+      window.addEventListener('orientationchange', resizeGame, false);
+
+      /*******************
+      SOCKER STUFF!
+      #################################################################################
+      ***************/
+      //create the socket and set the default to no ghost
+      var socket = io();
+      var hasghost = false;
+
+      //emit notghostconnect
+      socket.emit('notghostconnect');
+
+      socket.on('startseance', function (data) {
+        $('#messages').html("connected to ghost: " + data);
+
+      });
+
+      socket.on('move', function (data) {
+        shapes = data;
+        draw();
+      })
+
+       /*******************
+      SOCKER STUFF END
+      #################################################################################
+      ***************/
+
+
+
+      resizeGame();
+      draw();
+    });
+
+
+
+    //draw 
+    function drawplanchette(p) {
+      var w = planchette.width / 2;
+      var h = planchette.height / 2;
+      ctx.drawImage(planchette, (p.x - (w / 2)), (p.y - (h / 2)), w, h)
+    }
+
+    // draw a single rect
+    function circle(c) {
+      ctx.fillStyle = c.fill;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // clear the canvas
+    function clear() {
+      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    }
+
+
+    // redraw the scene
+    function draw() {
+
+      //check if the planchette images is loaded, if not then try to load it.
+      if (planchetteLoaded == false) {
+        planchette.onload = function () {
+          planchetteLoaded = true;
+        }
+      }
+
+
+
+      // clear the frame
+      clear();
+      // redraw each shape in the shapes[] array
+      for (var i = 0; i < shapes.length; i++) {
+
+
+        //if the planchette is loaded, draw it.
+        if (planchetteLoaded == true) {
+          drawplanchette(shapes[i])
+        }
+
+      }
+    }
+
+
+    function resizeGame() {
+      console.log("running resize");
+      gameArea = $('#gameArea');
+
+      var widthToHeight = 4 / 3;
+      var newWidth = window.innerWidth;
+      var newHeight = window.innerHeight;
+      var newWidthToHeight = newWidth / newHeight;
+
+      if (newWidthToHeight > widthToHeight) {
+        newWidth = newHeight * widthToHeight;
+        gameArea.height(newHeight);
+        gameArea.width(newWidth);
+      } else {
+        newHeight = newWidth / widthToHeight;
+        gameArea.width(newWidth);
+        gameArea.height(newHeight);
+      }
+
+      gameArea.marginTop = (-newHeight / 2) + 'px';
+      gameArea.marginLeft = (-newWidth / 2) + 'px';
+
+      gameCanvas = $('#gameCanvas');
+      console.log($('#gameCanvas').width());
+      ctx.canvas.width = newWidth;
+      ctx.canvas.height = newHeight;
+
+      WIDTH = newWidth;
+      HEIGHT = newHeight;
+      var offs = gameArea.offset();
+      offsetX = offs.left;
+      offsetY = offs.top;
+      console.log("offX: " + offsetX)
+    }
+  </script>
+
+</html>

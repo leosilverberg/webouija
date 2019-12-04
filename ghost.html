@@ -1,0 +1,249 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <h1>GHOST</h1>
+    <p id="messages">Waiting for a not ghost</p>
+
+    <div id="gameArea">
+        <canvas id="gameCanvas"></canvas>
+        <div id="statsPanel"></div>
+      </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+<script>
+var notghost;
+var c;
+var ctx;
+// drag related variables
+var dragok = false;
+var startX;
+var startY;
+var WIDTH;
+var HEIGHT;
+var offsetX;
+var offsetY=0;
+
+var planchette = new Image();
+planchette.src = "images/planchette.png";
+var planchetteLoaded = false;
+
+//draw planchette
+function drawplanchette(p){
+  var w = planchette.width / 2;
+  var h = planchette.height / 2;
+  ctx.drawImage(planchette,(p.x - (w/2)),(p.y - (h/2)), w, h)
+  console.log("drawing planchette at:" + p.x + " " + p.y)
+}
+
+var socket;
+// an array of objects that define different shapes
+var shapes=[];
+// define a circle
+shapes.push({x:500,y:500,width:228,height:237,fill:"#800080",isDragging:false});
+
+// draw a single rect
+function circle(c) {
+  ctx.fillStyle=c.fill;
+  ctx.beginPath();
+  ctx.arc(c.x,c.y,c.r,0,Math.PI*2);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// clear the canvas
+function clear() {
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+}
+
+
+// redraw the scene
+function draw() {
+  console.log("running draw")
+  if(planchetteLoaded == false){
+    console.log("planchette not loaded")
+    planchette.onload = function()
+    {
+      console.log("planchette loaded")
+        planchetteLoaded = true;
+        draw();
+    }
+  }
+  clear();
+  // redraw each shape in the shapes[] array
+  for(var i=0;i<shapes.length;i++){
+    // decide if the shape is a rect or circle
+    // (it's a rect if it has a width property)
+    if(planchetteLoaded == true){
+      console.log("drawing planchette")
+      drawplanchette(shapes[i])
+    }
+  }
+}
+
+
+$( document ).ready(function() {
+  c = document.getElementById("gameCanvas");
+  ctx = c.getContext("2d");
+    // listen for mouse events
+  c.onmousedown = myDown;
+  c.onmouseup = myUp;
+  c.onmousemove = myMove;
+  // call to draw the scene
+
+  resizeGame();
+  draw();
+});
+
+
+  $(function () {
+    socket = io();
+    
+    socket.emit('ghostconnect');
+    console.log("sent ghost connect")
+
+    socket.on('startseance', function(data){
+      $('#messages').html("connected to not ghost: "+data);
+      notghost = data;
+    })
+
+  });
+
+
+
+ 
+    function resizeGame() {
+    console.log("running resize");
+    gameArea = $('#gameArea');
+    
+    var widthToHeight = 4 / 3;
+    var newWidth = window.innerWidth;
+    var newHeight = window.innerHeight;
+    var newWidthToHeight = newWidth / newHeight;
+    
+    if (newWidthToHeight > widthToHeight) {
+        newWidth = newHeight * widthToHeight;
+        gameArea.height(newHeight);
+        gameArea.width(newWidth);
+    } else {
+        newHeight = newWidth / widthToHeight;
+        gameArea.width(newWidth);
+        gameArea.height(newHeight);
+    }
+    
+    gameArea.marginTop = (-newHeight / 2) + 'px';
+    gameArea.marginLeft = (-newWidth / 2) + 'px';
+    
+    gameCanvas = $('#gameCanvas');
+    console.log($('#gameCanvas').width());
+    ctx.canvas.width = newWidth;
+    ctx.canvas.height = newHeight;
+    
+    WIDTH = newWidth;
+    HEIGHT = newHeight;
+    var offs = gameArea.offset();
+    offsetX = offs.left;
+    offsetY = offs.top;
+}
+
+
+    // handle mousedown events
+function myDown(e){
+
+// tell the browser we're handling this mouse event
+e.preventDefault();
+e.stopPropagation();
+
+// get the current mouse position
+var mx=parseInt(e.clientX-offsetX);
+var my=parseInt(e.clientY-offsetY);
+
+// test each shape to see if mouse is inside
+dragok=false;
+for(var i=0;i<shapes.length;i++){
+  var s=shapes[i];
+  // decide if the shape is a rect or circle               
+  if(s.width){
+    // test if the mouse is inside this rect
+    if(mx>(s.x - (s.width/2)) && mx<s.x+s.width && my>(s.y - (s.height/2)) && my<s.y+s.height){
+      // if yes, set that rects isDragging=true
+      dragok=true;
+      s.isDragging=true;
+    }
+  }else{
+    var dx=s.x-mx;
+    var dy=s.y-my;
+    // test if the mouse is inside this circle
+    if(dx*dx+dy*dy<s.r*s.r){
+      dragok=true;
+      s.isDragging=true;
+    }
+  }
+}
+// save the current mouse position
+startX=mx;
+startY=my;
+}
+
+// handle mouseup events
+function myUp(e){
+  // tell the browser we're handling this mouse event
+  e.preventDefault();
+  e.stopPropagation();
+
+  // clear all the dragging flags
+  dragok = false;
+  for(var i=0;i<shapes.length;i++){
+    shapes[i].isDragging=false;
+  }
+}
+
+// handle mouse moves
+function myMove(e){
+  // if we're dragging anything...
+  if (dragok){
+
+    // tell the browser we're handling this mouse event
+    e.preventDefault();
+    e.stopPropagation();
+
+    // get the current mouse position
+    var mx=parseInt(e.clientX-offsetX);
+    var my=parseInt(e.clientY-offsetY);
+
+    // calculate the distance the mouse has moved
+    // since the last mousemove
+    var dx=mx-startX;
+    var dy=my-startY;
+
+    // move each rect that isDragging 
+    // by the distance the mouse has moved
+    // since the last mousemove
+    for(var i=0;i<shapes.length;i++){
+      var s=shapes[i];
+      if(s.isDragging){
+        s.x+=dx;
+        s.y+=dy;
+      }
+    }
+
+    // redraw the scene with the new rect positions
+    draw();
+
+    // reset the starting mouse position for the next mousemove
+    startX=mx;
+    startY=my;
+
+    // io.to(notghost).emit('move', shapes);
+    socket.emit('move',notghost, shapes);
+
+  }
+}
+     
+ 
+</script>
+</html>
